@@ -1,0 +1,49 @@
+version: 1
+default_environment: dev
+project_id: my_meltano_project
+
+environments:
+- name: dev
+- name: staging  
+- name: prod
+
+extractors:
+- name: tap-sigma-computing
+  namespace: tap_sigma_computing
+  pip_url: .
+  executable: tap-sigma-computing
+  capabilities:
+  - discover
+  - catalog
+  - properties
+  - state
+  settings:
+  - name: client_id
+    kind: password
+    description: Sigma Computing API Client ID
+  - name: client_secret
+    kind: password
+    description: Sigma Computing API Client Secret
+  - name: base_url
+    kind: string
+    description: Sigma Computing API Base URL (e.g., https://aws-api.sigmacomputing.com)
+    default: https://aws-api.sigmacomputing.com
+  select:
+  - workbooks.*
+  - users.*
+  - teams.*
+  - connections.*
+  - datasets.*
+  - folders.*
+  - user_attributes.*
+
+loaders:
+- name: target-jsonl
+  variant: andyh1203
+
+plugins:
+  extractors:
+  - name: tap-sigma-computing
+    namespace: tap_sigma_computing
+    pip_url: .
+    executable: tap-sigma-computing
