@@ -1,0 +1,91 @@
+name: Test tap-sigma-computing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov black flake8 mypy
+
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Check code formatting with black
+      run: |
+        black --check --diff .
+
+    - name: Type check with mypy
+      run: |
+        mypy tap_sigma_computing.py --ignore-missing-imports
+
+    - name: Test with pytest
+      run: |
+        pytest tests/ -v --cov=tap_sigma_computing --cov-report=xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Test discovery
+      run: |
+        echo '{"client_id": "dummy", "client_secret": "dummy", "base_url": "https://aws-api.sigmacomputing.com"}' > test_config.json
+        python tap_sigma_computing.py --config test_config.json --discover > catalog.json
+        # Verify catalog structure
+        python -c "import json; catalog = json.load(open('catalog.json')); assert 'streams' in catalog; print(f'Discovered {len(catalog[\"streams\"])} streams')"
+
+  integration-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Run integration tests
+      env:
+        SIGMA_CLIENT_ID: ${{ secrets.SIGMA_CLIENT_ID }}
+        SIGMA_CLIENT_SECRET: ${{ secrets.SIGMA_CLIENT_SECRET }}
+        SIGMA_BASE_URL: ${{ secrets.SIGMA_BASE_URL }}
+      run: |
+        if [ -n "$SIGMA_CLIENT_ID" ] && [ -n "$SIGMA_CLIENT_SECRET" ]; then
+          pytest tests/test_tap_sigma_computing.py::TestIntegration -v
+        else
+          echo "Skipping integration tests - no credentials provided"
+        fi
