@@ -1,6 +1,6 @@
 version: 1
 default_environment: dev
-project_id: my_meltano_project
+project_id: tap-sigma-snowflake
 
 environments:
 - name: dev
@@ -10,7 +10,7 @@ environments:
 extractors:
 - name: tap-sigma-computing
   namespace: tap_sigma_computing
-  pip_url: .
+  pip_url: -e .
   executable: tap-sigma-computing
   capabilities:
   - discover
@@ -26,7 +26,7 @@ extractors:
     description: Sigma Computing API Client Secret
   - name: base_url
     kind: string
-    description: Sigma Computing API Base URL (e.g., https://aws-api.sigmacomputing.com)
+    description: Sigma Computing API Base URL
     default: https://aws-api.sigmacomputing.com
   select:
   - workbooks.*
@@ -38,12 +38,53 @@ extractors:
   - user_attributes.*
 
 loaders:
-- name: target-jsonl
-  variant: andyh1203
+- name: target-snowflake
+  variant: transferwise
+  pip_url: pipelinewise-target-snowflake==2.1.0
+  settings:
+  - name: account
+    kind: string
+    description: Snowflake account name (e.g., xy12345.us-east-1)
+  - name: dbname
+    kind: string
+    description: Snowflake database name
+  - name: user
+    kind: string
+    description: Snowflake username
+  - name: password
+    kind: password
+    description: Snowflake password
+  - name: warehouse
+    kind: string
+    description: Snowflake warehouse name
+  - name: default_target_schema
+    kind: string
+    description: Default schema to load data into
+    default: sigma_computing
+  - name: batch_config
+    kind: object
+    description: Batch configuration for optimal loading
+    default:
+      batch_size_rows: 100000
+      batch_wait_limit_seconds: 3600
+
+jobs:
+- name: sigma-to-snowflake
+  tasks:
+  - tap-sigma-computing target-snowflake
+
+schedules:
+- name: sigma-daily
+  job: sigma-to-snowflake
+  interval: "0 6 * * *"  # Daily at 6 AM
 
 plugins:
   extractors:
   - name: tap-sigma-computing
     namespace: tap_sigma_computing
-    pip_url: .
+    pip_url: -e .
     executable: tap-sigma-computing
+  loaders:
+  - name: target-snowflake
+    variant: transferwise
+    pip_url: pipelinewise-target-snowflake==2.1.0
