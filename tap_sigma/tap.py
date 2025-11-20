@@ -45,19 +45,31 @@ class TapSigma(Tap):
     ).to_dict()
 
     def discover_streams(self) -> List[Stream]:
-        """Return a list of discovered streams."""
+        """Return a list of discovered streams.
+
+        Only includes streams that are verified working in Sigma API v2.
+        Excluded (404/400 errors): account-types, data-models, favorites, whoami, grants
+        """
         return [
-            # Remove AccountTypesStream and FavoritesStream - not available in API
+            # Top-level streams
             streams.ConnectionsStream(self),
             streams.DatasetsStream(self),
-            streams.MembersStream(self),
-            streams.TeamsStream(self),
             streams.FilesStream(self),
+            streams.MembersStream(self),
+            streams.TagsStream(self),
+            streams.TeamsStream(self),
+            streams.UserAttributesStream(self),
             streams.WorkbooksStream(self),
             streams.WorkbookPagesStream(self),
-            streams.TagsStream(self),
-            streams.UserAttributesStream(self),
-            streams.WhoAmIStream(self),
+            streams.WorkspacesStream(self),
+            # Dataset child streams
+            streams.DatasetMaterializationsStream(self),
+            streams.DatasetGrantsStream(self),
+            streams.DatasetSourcesStream(self),
+            # Workbook child streams
+            streams.WorkbookSchedulesStream(self),
+            streams.WorkbookMaterializationSchedulesStream(self),
+            streams.WorkbookPageElementsStream(self),
         ]
 
 
