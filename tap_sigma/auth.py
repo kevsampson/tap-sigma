@@ -42,31 +42,66 @@ class SigmaAuthenticator(OAuthAuthenticator):
         }
 
     def update_access_token(self) -> None:
-        """Update the access token and store expiration time."""
+        """Update the access token and store expiration time with retry logic."""
         request_time = time.time()
+        max_retries = 5
+        retry_count = 0
+        base_wait_time = 2
 
-        # Make the token request - Sigma API expects form data, not JSON
-        token_response = requests.post(
-            self.auth_endpoint,
-            data=self.oauth_request_body,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
+        while retry_count < max_retries:
+            try:
+                # Make the token request - Sigma API expects form data, not JSON
+                token_response = requests.post(
+                    self.auth_endpoint,
+                    data=self.oauth_request_body,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
 
-        try:
-            token_response.raise_for_status()
-        except requests.HTTPError as ex:
-            msg = f"Failed to get access token: {token_response.text}"
-            raise RuntimeError(msg) from ex
+                # Handle rate limiting specifically
+                if token_response.status_code == 429:
+                    retry_count += 1
+                    wait_time = base_wait_time * (2 ** retry_count)  # Exponential backoff
 
-        token_json = token_response.json()
-        self.access_token = token_json.get("access_token")
+                    # Check for Retry-After header
+                    retry_after = token_response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait_time = int(retry_after)
+                        except ValueError:
+                            pass
 
-        # Sigma tokens expire after 1 hour (3600 seconds)
-        # Set expiration slightly earlier to refresh before actual expiration
-        expires_in = token_json.get("expires_in", 3600)
-        self._token_expires_at = request_time + expires_in - 300  # 5 min buffer
+                    self.logger.warning(
+                        f"OAuth rate limit hit (429). Retry {retry_count}/{max_retries}. "
+                        f"Waiting {wait_time} seconds..."
+                    )
+                    time.sleep(wait_time)
+                    continue
 
-        self.logger.info("Successfully obtained new access token")
+                # Raise for other HTTP errors
+                token_response.raise_for_status()
+
+                # Success - parse token
+                token_json = token_response.json()
+                self.access_token = token_json.get("access_token")
+
+                # Sigma tokens expire after 1 hour (3600 seconds)
+                # Set expiration slightly earlier to refresh before actual expiration
+                expires_in = token_json.get("expires_in", 3600)
+                self._token_expires_at = request_time + expires_in - 300  # 5 min buffer
+
+                self.logger.info("Successfully obtained new access token")
+                return
+
+            except requests.HTTPError as ex:
+                if token_response.status_code != 429:
+                    # Non-rate-limit error, raise immediately
+                    msg = f"Failed to get access token: {token_response.text}"
+                    raise RuntimeError(msg) from ex
+                # Rate limit error will be retried in the loop
+
+        # If we've exhausted retries
+        msg = f"Failed to get access token after {max_retries} retries due to rate limiting"
+        raise RuntimeError(msg)
 
     @property
     def is_token_valid(self) -> bool:

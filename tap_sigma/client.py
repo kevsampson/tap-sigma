@@ -166,16 +166,16 @@ class SigmaStream(RESTStream):
             yield from data
 
     def backoff_wait_generator(self):
-        """Generate wait times for backoff with jitter.
+        """Generate wait times for backoff with exponential backoff.
 
         Yields:
             Wait time in seconds.
         """
-        # Start with 1 second and double each time, up to 60 seconds
-        wait_time = 1
+        # Start with 2 seconds for rate limits, double each time, up to 120 seconds
+        wait_time = 2
         while True:
             yield wait_time
-            wait_time = min(wait_time * 2, 60)
+            wait_time = min(wait_time * 2, 120)
 
     def backoff_max_tries(self) -> int:
         """Maximum number of retry attempts.
@@ -183,4 +183,51 @@ class SigmaStream(RESTStream):
         Returns:
             Max retry count.
         """
-        return 5
+        return 7  # Allow more retries for rate limiting
+
+    def backoff_runtime(self, response: requests.Response) -> int:
+        """Calculate backoff time for rate limit errors.
+
+        Args:
+            response: API response.
+
+        Returns:
+            Wait time in seconds before retrying.
+        """
+        # Check if this is a rate limit error
+        if response.status_code == 429:
+            # Check for Retry-After header
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    return int(retry_after)
+                except ValueError:
+                    pass
+            # Default to 60 seconds for rate limit errors
+            self.logger.warning(
+                f"Rate limit hit (429). Waiting 60 seconds before retry..."
+            )
+            return 60
+        # For other errors, use default backoff
+        return None
+
+    def validate_response(self, response: requests.Response) -> None:
+        """Validate HTTP response and handle rate limiting.
+
+        Args:
+            response: API response.
+
+        Raises:
+            Exception: If response is not successful after retries.
+        """
+        if response.status_code == 429:
+            msg = (
+                f"Rate limit exceeded (429). "
+                f"Response: {response.text[:200]}"
+            )
+            self.logger.warning(msg)
+            # Let backoff_runtime handle the wait time
+            raise Exception(msg)
+
+        # Call parent validation for other status codes
+        super().validate_response(response)
