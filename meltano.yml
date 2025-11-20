@@ -1,0 +1,34 @@
+version: 1
+send_anonymous_usage_stats: false
+project_id: tap-sigma-dev
+
+plugins:
+  extractors:
+  - name: tap-sigma
+    namespace: tap_sigma
+    pip_url: -e .
+    capabilities:
+    - catalog
+    - state
+    - discover
+    settings:
+    - name: client_id
+      kind: password
+      description: Sigma Computing API Client ID
+    - name: client_secret
+      kind: password
+      description: Sigma Computing API Client Secret
+    - name: api_url
+      description: Base API URL (e.g., https://aws-api.sigmacomputing.com)
+    - name: start_date
+      kind: date_iso8601
+      description: Earliest record date to sync
+    config:
+      client_id: $SIGMA_CLIENT_ID
+      client_secret: $SIGMA_CLIENT_SECRET
+      api_url: https://aws-api.sigmacomputing.com
+
+  loaders:
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
