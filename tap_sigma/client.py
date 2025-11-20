@@ -75,6 +75,8 @@ class SigmaPaginator(BaseAPIPaginator):
 class SigmaStream(RESTStream):
     """Base stream class for Sigma Computing API."""
 
+    _shared_authenticator: Optional[SigmaAuthenticator] = None
+
     @property
     def url_base(self) -> str:
         """Return the base URL for the API."""
@@ -83,9 +85,13 @@ class SigmaStream(RESTStream):
 
     @property
     def authenticator(self) -> SigmaAuthenticator:
-        """Return authenticator instance."""
-        auth_endpoint = urljoin(self.url_base, "/v2/auth/token")
-        return SigmaAuthenticator(stream=self, auth_endpoint=auth_endpoint)
+        """Return shared authenticator instance to avoid rate limiting."""
+        if SigmaStream._shared_authenticator is None:
+            auth_endpoint = urljoin(self.url_base, "/v2/auth/token")
+            SigmaStream._shared_authenticator = SigmaAuthenticator(
+                stream=self, auth_endpoint=auth_endpoint
+            )
+        return SigmaStream._shared_authenticator
 
     @property
     def http_headers(self) -> Dict[str, str]:
