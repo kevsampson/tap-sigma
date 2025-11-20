@@ -78,3 +78,17 @@ catalog.json
 
 # Poetry
 poetry.lock
+
+# Meltano
+.meltano/
+meltano.yml
+
+# Snowflake configs
+snowflake-config.json
+*-config.json
+
+# Pipeline logs
+*.log
+
+# Separate pipeline directory
+sigma-snowflake-pipeline/
