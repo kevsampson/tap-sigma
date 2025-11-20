@@ -45,11 +45,11 @@ class SigmaAuthenticator(OAuthAuthenticator):
         """Update the access token and store expiration time."""
         request_time = time.time()
 
-        # Make the token request
+        # Make the token request - Sigma API expects form data, not JSON
         token_response = requests.post(
             self.auth_endpoint,
-            json=self.oauth_request_body,
-            headers={"Content-Type": "application/json"},
+            data=self.oauth_request_body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
         try:

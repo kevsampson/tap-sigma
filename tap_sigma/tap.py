@@ -47,16 +47,14 @@ class TapSigma(Tap):
     def discover_streams(self) -> List[Stream]:
         """Return a list of discovered streams."""
         return [
-            streams.AccountTypesStream(self),
+            # Remove AccountTypesStream and FavoritesStream - not available in API
             streams.ConnectionsStream(self),
             streams.DatasetsStream(self),
-            streams.DataModelsStream(self),
             streams.MembersStream(self),
             streams.TeamsStream(self),
             streams.FilesStream(self),
             streams.WorkbooksStream(self),
             streams.WorkbookPagesStream(self),
-            streams.FavoritesStream(self),
             streams.TagsStream(self),
             streams.UserAttributesStream(self),
             streams.WhoAmIStream(self),
