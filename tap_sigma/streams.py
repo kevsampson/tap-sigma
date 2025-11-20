@@ -336,7 +336,7 @@ class DatasetMaterializationsStream(SigmaStream):
     """Dataset materializations stream."""
 
     name = "dataset_materializations"
-    primary_keys = ["datasetId", "materializationId"]
+    primary_keys = ["datasetId"]  # No unique materializationId in API response
     replication_key = None
     parent_stream_type = DatasetsStream
 
@@ -347,10 +347,12 @@ class DatasetMaterializationsStream(SigmaStream):
 
     schema = th.PropertiesList(
         th.Property("datasetId", th.StringType),
-        th.Property("materializationId", th.StringType),
         th.Property("status", th.StringType),
-        th.Property("createdAt", th.DateTimeType),
-        th.Property("updatedAt", th.DateTimeType),
+        th.Property("error", th.StringType),
+        th.Property("finishedAt", th.DateTimeType),
+        th.Property("runtimeSecs", th.NumberType),
+        th.Property("numBytes", th.IntegerType),
+        th.Property("numRows", th.IntegerType),
     ).to_dict()
 
     def post_process(self, row: dict, context: Optional[Dict] = None) -> dict:
